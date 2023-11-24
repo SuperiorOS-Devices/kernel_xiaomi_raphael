@@ -1298,7 +1298,7 @@ int hci_inquiry(void __user *arg)
 	/* cache_dump can't sleep. Therefore we allocate temp buffer and then
 	 * copy it to the user space.
 	 */
-	buf = kmalloc(sizeof(struct inquiry_info) * max_rsp, GFP_KERNEL);
+	buf = kmalloc_array(max_rsp, sizeof(struct inquiry_info), GFP_KERNEL);
 	if (!buf) {
 		err = -ENOMEM;
 		goto done;
@@ -3113,7 +3113,11 @@ int hci_register_dev(struct hci_dev *hdev)
 	if (id < 0)
 		return id;
 
-	snprintf(hdev->name, sizeof(hdev->name), "hci%d", id);
+	error = dev_set_name(&hdev->dev, "hci%u", id);
+	if (error)
+		return error;
+
+	hdev->name = dev_name(&hdev->dev);
 	hdev->id = id;
 
 	BT_DBG("%p name %s bus %d", hdev, hdev->name, hdev->bus);
@@ -3134,8 +3138,6 @@ int hci_register_dev(struct hci_dev *hdev)
 
 	if (!IS_ERR_OR_NULL(bt_debugfs))
 		hdev->debugfs = debugfs_create_dir(hdev->name, bt_debugfs);
-
-	dev_set_name(&hdev->dev, "%s", hdev->name);
 
 	error = device_add(&hdev->dev);
 	if (error < 0)
@@ -4307,8 +4309,8 @@ static void hci_cmd_work(struct work_struct *work)
 			if (test_bit(HCI_RESET, &hdev->flags))
 				cancel_delayed_work(&hdev->cmd_timer);
 			else
-				schedule_delayed_work(&hdev->cmd_timer,
-						      HCI_CMD_TIMEOUT);
+				queue_delayed_work(system_power_efficient_wq,
+					&hdev->cmd_timer, HCI_CMD_TIMEOUT);
 		} else {
 			skb_queue_head(&hdev->cmd_q, skb);
 			queue_work(hdev->workqueue, &hdev->cmd_work);

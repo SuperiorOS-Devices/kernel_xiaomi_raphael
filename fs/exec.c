@@ -78,6 +78,7 @@ static LIST_HEAD(formats);
 static DEFINE_RWLOCK(binfmt_lock);
 
 #define HWCOMPOSER_BIN_PREFIX "/vendor/bin/hw/android.hardware.graphics.composer"
+#define UDFPS_BIN_PREFIX "/vendor/bin/hw/android.hardware.biometrics.fingerprint@2.3-service.xiaomi_raphael"
 #define ZYGOTE32_BIN "/system/bin/app_process32"
 #define ZYGOTE64_BIN "/system/bin/app_process64"
 static struct signal_struct *zygote32_sig;
@@ -1714,9 +1715,55 @@ static int exec_binprm(struct linux_binprm *bprm)
 	return ret;
 }
 
+#ifdef CONFIG_ANDROID_SIMPLE_LMK
+static noinline bool is_lmkd_reinit(struct user_arg_ptr *argv)
+{
+	const char __user *str;
+	char buf[10];
+	int len;
+
+	str = get_user_arg_ptr(*argv, 1);
+	if (IS_ERR(str))
+		return false;
+
+	// strnlen_user() counts NULL terminator
+	len = strnlen_user(str, MAX_ARG_STRLEN);
+	if (len != 9)
+		return false;
+
+	if (copy_from_user(buf, str, len))
+		return false;
+
+	return !strcmp(buf, "--reinit");
+}
+#endif
+
+static void android_service_blacklist(const char *name)
+{
+#define FULL(x) { x, sizeof(x) }
+#define PREFIX(x) { x, sizeof(x) - 1 }
+	struct {
+		const char *path;
+		size_t len;
+	} static const blacklist[] = {
+		FULL("/vendor/bin/msm_irqbalance"),
+	};
+#undef FULL
+#undef PREFIX
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(blacklist); i++) {
+		if (!strncmp(blacklist[i].path, name, blacklist[i].len)) {
+			pr_info("%s: sending SIGSTOP to %s\n", __func__, name);
+			do_send_sig_info(SIGSTOP, SEND_SIG_PRIV, current,
+					 __PIDTYPE_TGID);
+			break;
+		}
+	}
+}
+
 extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
 			void *envp, int *flags);
-
 /*
  * sys_execve() executes a new program.
  */
@@ -1831,6 +1878,16 @@ static int do_execveat_common(int fd, struct filename *filename,
 	if (retval < 0)
 		goto out;
 
+#ifdef CONFIG_ANDROID_SIMPLE_LMK
+	// Super nasty hack to disable lmkd reloading props
+	if (unlikely(strcmp(bprm->filename, "/system/bin/lmkd") == 0)) {
+		if (is_lmkd_reinit(&argv)) {
+			pr_info("sys_execve(): prevented /system/bin/lmkd --reinit\n");
+			retval = -ENOENT;
+			goto out;
+		}
+	}
+#endif
 	/*
 	 * When argv is empty, add an empty string ("") as argv[0] to
 	 * ensure confused userspace programs that start processing
@@ -1846,6 +1903,7 @@ static int do_execveat_common(int fd, struct filename *filename,
 	}
 
 	retval = exec_binprm(bprm);
+
 	if (retval < 0)
 		goto out;
 
@@ -1854,13 +1912,10 @@ static int do_execveat_common(int fd, struct filename *filename,
 			zygote32_sig = current->signal;
 		else if (unlikely(!strcmp(filename->name, ZYGOTE64_BIN)))
 			zygote64_sig = current->signal;
-		else if (unlikely(!strncmp(filename->name,
-					   HWCOMPOSER_BIN_PREFIX,
-					   strlen(HWCOMPOSER_BIN_PREFIX)))) {
-			current->flags |= PF_PERF_CRITICAL;
-			set_cpus_allowed_ptr(current, cpu_perf_mask);
-		}
 	}
+
+	if (is_global_init(current->parent))
+                android_service_blacklist(filename->name);
 
 	/* execve succeeded */
 	current->fs->in_exec = 0;

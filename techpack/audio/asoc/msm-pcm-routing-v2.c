@@ -1135,9 +1135,6 @@ static int msm_routing_get_adm_topology(int fedai_id, int session_type,
 	pr_debug("%s: fedai_id %d, session_type %d, be_id %d\n",
 	       __func__, fedai_id, session_type, be_id);
 
-	if (cal_data == NULL)
-		goto done;
-
 	app_type = fe_dai_app_type_cfg[fedai_id][session_type][be_id].app_type;
 	acdb_dev_id =
 		fe_dai_app_type_cfg[fedai_id][session_type][be_id].acdb_dev_id;
@@ -1158,8 +1155,6 @@ static int msm_routing_get_adm_topology(int fedai_id, int session_type,
 		if (topology < 0)
 			topology = NULL_COPP_TOPOLOGY;
 	}
-done:
-	pr_debug("%s: Using topology %d\n", __func__, topology);
 	return topology;
 }
 
@@ -2124,6 +2119,11 @@ static void msm_pcm_routing_process_voice(u16 reg, u16 val, int set)
 
 	pr_debug("%s: FE DAI 0x%x session_id 0x%x\n",
 		__func__, val, session_id);
+
+	if (!session_id) {
+		pr_err("%s: Invalid session_id %x\n", __func__, session_id);
+		return;
+	}
 
 	mutex_lock(&routing_lock);
 
@@ -18311,22 +18311,22 @@ static const int int4_mi2s_rx_vi_fb_tx_stereo_ch_value[] = {
 };
 
 static const struct soc_enum slim0_rx_vi_fb_lch_mux_enum =
-	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_SLIMBUS_0_RX, 0, 0,
+	SOC_VALUE_ENUM_DOUBLE(SND_SOC_NOPM, MSM_BACKEND_DAI_SLIMBUS_0_RX, 0, 0,
 	ARRAY_SIZE(slim0_rx_vi_fb_tx_lch_mux_text),
 	slim0_rx_vi_fb_tx_lch_mux_text, slim0_rx_vi_fb_tx_lch_value);
 
 static const struct soc_enum slim0_rx_vi_fb_rch_mux_enum =
-	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_SLIMBUS_0_RX, 0, 0,
+	SOC_VALUE_ENUM_DOUBLE(SND_SOC_NOPM, MSM_BACKEND_DAI_SLIMBUS_0_RX, 0, 0,
 	ARRAY_SIZE(slim0_rx_vi_fb_tx_rch_mux_text),
 	slim0_rx_vi_fb_tx_rch_mux_text, slim0_rx_vi_fb_tx_rch_value);
 
 static const struct soc_enum wsa_rx_0_vi_fb_lch_mux_enum =
-	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_WSA_CDC_DMA_RX_0, 0, 0,
+	SOC_VALUE_ENUM_DOUBLE(SND_SOC_NOPM, MSM_BACKEND_DAI_WSA_CDC_DMA_RX_0, 0, 0,
 	ARRAY_SIZE(wsa_rx_0_vi_fb_tx_lch_mux_text),
 	wsa_rx_0_vi_fb_tx_lch_mux_text, wsa_rx_0_vi_fb_tx_lch_value);
 
 static const struct soc_enum wsa_rx_0_vi_fb_rch_mux_enum =
-	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_WSA_CDC_DMA_RX_0, 0, 0,
+	SOC_VALUE_ENUM_DOUBLE(SND_SOC_NOPM, MSM_BACKEND_DAI_WSA_CDC_DMA_RX_0, 0, 0,
 	ARRAY_SIZE(wsa_rx_0_vi_fb_tx_rch_mux_text),
 	wsa_rx_0_vi_fb_tx_rch_mux_text, wsa_rx_0_vi_fb_tx_rch_value);
 
@@ -18334,19 +18334,19 @@ static const struct soc_enum mi2s_rx_vi_fb_mux_enum =
 #ifdef CONFIG_SND_SOC_TFA9874_FOR_DAVI
 	SOC_VALUE_ENUM_DOUBLE(0, PLATFORM_RX_VI_FB_MUX_ENUM, 0, 0,
 #else
-	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_PRI_MI2S_RX, 0, 0,
+	SOC_VALUE_ENUM_DOUBLE(SND_SOC_NOPM, MSM_BACKEND_DAI_PRI_MI2S_RX, 0, 0,
 #endif
 	ARRAY_SIZE(mi2s_rx_vi_fb_tx_mux_text),
 	mi2s_rx_vi_fb_tx_mux_text, mi2s_rx_vi_fb_tx_value);
 
 static const struct soc_enum int4_mi2s_rx_vi_fb_mono_ch_mux_enum =
-	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_INT4_MI2S_RX, 0, 0,
+	SOC_VALUE_ENUM_DOUBLE(SND_SOC_NOPM, MSM_BACKEND_DAI_INT4_MI2S_RX, 0, 0,
 	ARRAY_SIZE(int4_mi2s_rx_vi_fb_tx_mono_mux_text),
 	int4_mi2s_rx_vi_fb_tx_mono_mux_text,
 	int4_mi2s_rx_vi_fb_tx_mono_ch_value);
 
 static const struct soc_enum int4_mi2s_rx_vi_fb_stereo_ch_mux_enum =
-	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_INT4_MI2S_RX, 0, 0,
+	SOC_VALUE_ENUM_DOUBLE(SND_SOC_NOPM, MSM_BACKEND_DAI_INT4_MI2S_RX, 0, 0,
 	ARRAY_SIZE(int4_mi2s_rx_vi_fb_tx_stereo_mux_text),
 	int4_mi2s_rx_vi_fb_tx_stereo_mux_text,
 	int4_mi2s_rx_vi_fb_tx_stereo_ch_value);

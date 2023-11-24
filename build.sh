@@ -20,10 +20,10 @@ export SUBARCH=arm64
 export ARCH=arm64
 export CC=$HOME/toolchains/boolx-clang/bin/clang
 
-VER="V1.1-GreatPicker"
+VER="V1.3-GreatShoot"
 KERNEL_DIR=`pwd`
 REPACK_DIR=$HOME/AnyKernel3
-ZIP_MOVE=$HOME/Boolx-releases
+ZIP_MOVE=$HOME/Boolx
 BASE_AK_VER="Bool-X-Raphael-"
 DATE=`date +"%Y%m%d-%H%M"`
 AK_VER="$BASE_AK_VER$VER"
@@ -52,7 +52,7 @@ function make_menuconfig {
 }
 function building {
 		echo
-		make O=out CC=$HOME/toolchains/boolx-clang/bin/clang AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip KBUILD_BUILD_USER=OnettBoots KBUILD_BUILD_HOST=SuperTermux -j$(grep -c ^processor /proc/cpuinfo)
+		make O=out CC=$HOME/toolchains/boolx-clang/bin/clang LLVM=1 LLVM_IAS=1 KBUILD_BUILD_USER=OnettBoots KBUILD_BUILD_HOST=SuperTermux -j$(grep -c ^processor /proc/cpuinfo)
 }
 function make_boot {
 		cp $KERNEL $REPACK_DIR && cp $DTBO $REPACK_DIR/oc
@@ -90,8 +90,8 @@ case "$cchoice" in
 		;;
 	x86|X86 )
 		echo
-		echo "Downloading Boolx-clang for Aarch64 host."
-		git clone https://gitlab.com/onettboots/boolx-clang.git -b Clang-16.0_x86 $TOOLCHAINS
+		echo "Downloading Boolx-clang for X86 host."
+		git clone https://gitlab.com/onettboots/boolx-clang.git -b Clang-17.0_x86 $TOOLCHAINS
 		break
 		;;
 	* )

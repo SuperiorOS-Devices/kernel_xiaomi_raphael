@@ -2239,8 +2239,12 @@ static int ni_populate_mclk_value(struct radeon_device *rdev,
 						     ASIC_INTERNAL_MEMORY_SS, vco_freq)) {
 			u32 reference_clock = rdev->clock.mpll.reference_freq;
 			u32 decoded_ref = rv740_get_decoded_reference_divider(dividers.ref_div);
-			u32 clk_s = reference_clock * 5 / (decoded_ref * ss.rate);
-			u32 clk_v = ss.percentage *
+			u32 clk_s, clk_v;
+
+			if (!decoded_ref)
+				return -EINVAL;
+			clk_s = reference_clock * 5 / (decoded_ref * ss.rate);
+			clk_v = ss.percentage *
 				(0x4000 * dividers.whole_fb_div + 0x800 * dividers.frac_fb_div) / (clk_s * 625);
 
 			mpll_ss1 &= ~CLKV_MASK;
@@ -3996,8 +4000,9 @@ static int ni_parse_power_table(struct radeon_device *rdev)
 		return -EINVAL;
 	power_info = (union power_info *)(mode_info->atom_context->bios + data_offset);
 
-	rdev->pm.dpm.ps = kzalloc(sizeof(struct radeon_ps) *
-				  power_info->pplib.ucNumStates, GFP_KERNEL);
+	rdev->pm.dpm.ps = kcalloc(power_info->pplib.ucNumStates,
+				  sizeof(struct radeon_ps),
+				  GFP_KERNEL);
 	if (!rdev->pm.dpm.ps)
 		return -ENOMEM;
 
@@ -4073,7 +4078,9 @@ int ni_dpm_init(struct radeon_device *rdev)
 		return ret;
 
 	rdev->pm.dpm.dyn_state.vddc_dependency_on_dispclk.entries =
-		kzalloc(4 * sizeof(struct radeon_clock_voltage_dependency_entry), GFP_KERNEL);
+		kcalloc(4,
+			sizeof(struct radeon_clock_voltage_dependency_entry),
+			GFP_KERNEL);
 	if (!rdev->pm.dpm.dyn_state.vddc_dependency_on_dispclk.entries) {
 		r600_free_extended_power_table(rdev);
 		return -ENOMEM;

@@ -207,8 +207,6 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 		goto error;
 	}
 
-	panel->bl_config.bl_level = bl_lvl;
-
 	/* scale backlight */
 	bl_scale = panel->bl_config.bl_scale;
 	bl_temp = bl_lvl * bl_scale / MAX_BL_SCALE_LEVEL;
@@ -231,6 +229,18 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 	if (rc)
 		pr_err("unable to set backlight\n");
 
+	if (bl_lvl == 4095 && panel->bl_config.bl_level <= 2047)
+	{
+		panel->hbm_mode = 1;
+		rc = dsi_panel_apply_hbm_mode(panel);
+	}
+	else if (bl_lvl <= 2047 && panel->bl_config.bl_level == 4095)
+	{
+		panel->hbm_mode = 0;
+		rc = dsi_panel_apply_hbm_mode(panel);
+	}
+
+	panel->bl_config.bl_level = bl_lvl;
 	rc = dsi_display_clk_ctrl(dsi_display->dsi_clk_handle,
 			DSI_CORE_CLK, DSI_CLK_OFF);
 	if (rc) {
@@ -1068,11 +1078,12 @@ struct blbl {
 };
 
 struct blbl aod_bl_lut[] = {
-        {0, 1},
-        {10, 1},
-        {40, 9},
-        {90, 30},
-        {120, 40},
+	{0, 1},
+	{10, 1},
+	{40, 9},
+	{90, 30},
+	{120, 60},
+	{280, 100},
 };
 
 u32 dsi_panel_get_aod_bl(struct dsi_display *display) {
@@ -1080,13 +1091,13 @@ u32 dsi_panel_get_aod_bl(struct dsi_display *display) {
         //cached value is better than reading display->panel->bl_config.bl_level
         u32 cur_bl = dsi_panel_backlight_get();
 
-        for (i = 0; i < 5; i++)
+	for (i = 0; i < 6; i++)
                 if (aod_bl_lut[i].bl >= cur_bl)
                         break;
         if (i == 0)
                 return aod_bl_lut[i].aod_bl;
 
-        if (i == 4)
+        if (i == 5)
                 return aod_bl_lut[i - 1].aod_bl;
 
         return interpolate(cur_bl,
@@ -1126,7 +1137,7 @@ int dsi_display_set_power(struct drm_connector *connector,
 		break;
 	case SDE_MODE_DPMS_LP2:
 		dsi_panel_set_backlight(display->panel, dsi_panel_get_aod_bl(display));
-		usleep_range(20000, 30000);
+		usleep_range(16000, 24000);
 		rc = dsi_panel_set_lp2(display->panel);
 		break;
 	case SDE_MODE_DPMS_ON:
@@ -5118,6 +5129,9 @@ static ssize_t sysfs_hbm_write(struct device *dev,
 	if (!display->panel)
 		return -EINVAL;
 
+        if (display->panel->bl_config.bl_level > 2047)
+                return count;
+
 	ret = kstrtoint(buf, 10, &hbm_mode);
 	if (ret) {
 		pr_err("kstrtoint failed. ret=%d\n", ret);
@@ -7472,7 +7486,7 @@ static int dsi_display_qsync(struct dsi_display *display, bool enable)
 	int rc = 0;
 
 	if (!display->panel->qsync_caps.qsync_min_fps) {
-		pr_err("%s:ERROR: qsync set, but no fps\n", __func__);
+		pr_debug("%s:ERROR: qsync set, but no fps\n", __func__);
 		return 0;
 	}
 

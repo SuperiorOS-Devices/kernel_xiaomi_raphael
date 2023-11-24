@@ -968,8 +968,9 @@ static int bcm_tx_setup(struct bcm_msg_head *msg_head, struct msghdr *msg,
 
 		/* create array for CAN frames and copy the data */
 		if (msg_head->nframes > 1) {
-			op->frames = kmalloc(msg_head->nframes * op->cfsiz,
-					     GFP_KERNEL);
+			op->frames = kmalloc_array(msg_head->nframes,
+						   op->cfsiz,
+						   GFP_KERNEL);
 			if (!op->frames) {
 				kfree(op);
 				return -ENOMEM;
@@ -1148,15 +1149,17 @@ static int bcm_rx_setup(struct bcm_msg_head *msg_head, struct msghdr *msg,
 
 		if (msg_head->nframes > 1) {
 			/* create array for CAN frames and copy the data */
-			op->frames = kmalloc(msg_head->nframes * op->cfsiz,
-					     GFP_KERNEL);
+			op->frames = kmalloc_array(msg_head->nframes,
+						   op->cfsiz,
+						   GFP_KERNEL);
 			if (!op->frames) {
 				kfree(op);
 				return -ENOMEM;
 			}
 
 			/* create and init array for received CAN frames */
-			op->last_frames = kzalloc(msg_head->nframes * op->cfsiz,
+			op->last_frames = kcalloc(msg_head->nframes,
+						  op->cfsiz,
 						  GFP_KERNEL);
 			if (!op->last_frames) {
 				kfree(op->frames);
@@ -1572,6 +1575,12 @@ static int bcm_release(struct socket *sock)
 
 	lock_sock(sk);
 
+#if IS_ENABLED(CONFIG_PROC_FS)
+	/* remove procfs entry */
+	if (net->can.bcmproc_dir && bo->bcm_proc_read)
+		remove_proc_entry(bo->procname, net->can.bcmproc_dir);
+#endif /* CONFIG_PROC_FS */
+
 	list_for_each_entry_safe(op, next, &bo->tx_ops, list)
 		bcm_remove_op(op);
 
@@ -1606,12 +1615,6 @@ static int bcm_release(struct socket *sock)
 
 	list_for_each_entry_safe(op, next, &bo->rx_ops, list)
 		bcm_remove_op(op);
-
-#if IS_ENABLED(CONFIG_PROC_FS)
-	/* remove procfs entry */
-	if (net->can.bcmproc_dir && bo->bcm_proc_read)
-		remove_proc_entry(bo->procname, net->can.bcmproc_dir);
-#endif /* CONFIG_PROC_FS */
 
 	/* remove device reference */
 	if (bo->bound) {

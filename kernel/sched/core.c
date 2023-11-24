@@ -32,6 +32,7 @@
 #include <linux/delay.h>
 
 #include <linux/kthread.h>
+#include <linux/event_tracking.h>
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
@@ -1881,11 +1882,6 @@ static int __set_cpus_allowed_ptr(struct task_struct *p,
 	int ret = 0;
 	cpumask_t allowed_mask;
 
-	/* Don't allow perf-critical threads to have non-perf affinities */
-	if ((p->flags & PF_PERF_CRITICAL) && new_mask != cpu_lp_mask &&
-	    new_mask != cpu_perf_mask && new_mask != cpu_prime_mask)
-		return -EINVAL;
-
 	rq = task_rq_lock(p, &rf);
 	update_rq_clock(rq);
 
@@ -3430,7 +3426,6 @@ void wake_up_new_task(struct task_struct *p)
 	 * Use __set_task_cpu() to avoid calling sched_class::migrate_task_rq,
 	 * as we're not fully set-up yet.
 	 */
-	p->recent_used_cpu = task_cpu(p);
 	__set_task_cpu(p, select_task_rq(p, task_cpu(p), SD_BALANCE_FORK, 0, 1));
 #endif
 	rq = __task_rq_lock(p, &rf);
@@ -4081,13 +4076,6 @@ void scheduler_tick(void)
 
 	if (idle_cpu(cpu) && is_reserved(cpu))
 		clear_reserved(cpu);
-
-#ifdef CONFIG_SMP
-	rq_lock(rq, &rf);
-	if (idle_cpu(cpu) && is_reserved(cpu) && !rq->active_balance)
-		clear_reserved(cpu);
-	rq_unlock(rq, &rf);
-#endif
 }
 
 #ifdef CONFIG_NO_HZ_FULL

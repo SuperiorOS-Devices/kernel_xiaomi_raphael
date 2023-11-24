@@ -486,8 +486,9 @@ static int uvesafb_vbe_getmodes(struct uvesafb_ktask *task,
 		mode++;
 	}
 
-	par->vbe_modes = kzalloc(sizeof(struct vbe_mode_ib) *
-				par->vbe_modes_cnt, GFP_KERNEL);
+	par->vbe_modes = kcalloc(par->vbe_modes_cnt,
+				 sizeof(struct vbe_mode_ib),
+				 GFP_KERNEL);
 	if (!par->vbe_modes)
 		return -ENOMEM;
 
@@ -858,7 +859,7 @@ static int uvesafb_vbe_init_mode(struct fb_info *info)
 	 * Convert the modelist into a modedb so that we can use it with
 	 * fb_find_mode().
 	 */
-	mode = kzalloc(i * sizeof(*mode), GFP_KERNEL);
+	mode = kcalloc(i, sizeof(*mode), GFP_KERNEL);
 	if (mode) {
 		i = 0;
 		list_for_each(pos, &info->modelist) {
@@ -1931,10 +1932,10 @@ static void uvesafb_exit(void)
 		}
 	}
 
-	cn_del_callback(&uvesafb_cn_id);
 	driver_remove_file(&uvesafb_driver.driver, &driver_attr_v86d);
 	platform_device_unregister(uvesafb_device);
 	platform_driver_unregister(&uvesafb_driver);
+	cn_del_callback(&uvesafb_cn_id);
 }
 
 module_exit(uvesafb_exit);

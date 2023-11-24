@@ -1530,6 +1530,13 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 	{
+		.procname       = "reap_mem_on_sigkill",
+		.data           = &sysctl_reap_mem_on_sigkill,
+		.maxlen         = sizeof(sysctl_reap_mem_on_sigkill),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec,
+	},
+	{
 		.procname	= "overcommit_ratio",
 		.data		= &sysctl_overcommit_ratio,
 		.maxlen		= sizeof(sysctl_overcommit_ratio),
@@ -3338,7 +3345,8 @@ int proc_do_large_bitmap(struct ctl_table *table, int write,
 		if (IS_ERR(kbuf))
 			return PTR_ERR(kbuf);
 
-		tmp_bitmap = kzalloc(BITS_TO_LONGS(bitmap_len) * sizeof(unsigned long),
+		tmp_bitmap = kcalloc(BITS_TO_LONGS(bitmap_len),
+				     sizeof(unsigned long),
 				     GFP_KERNEL);
 		if (!tmp_bitmap) {
 			kfree(kbuf);
