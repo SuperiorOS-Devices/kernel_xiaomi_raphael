@@ -1096,6 +1096,8 @@ static bool rcu_is_callbacks_kthread(void)
 	return __this_cpu_read(rcu_cpu_kthread_task) == current;
 }
 
+extern int kp_active_mode(void);
+
 #define RCU_BOOST_DELAY_JIFFIES DIV_ROUND_UP(CONFIG_RCU_BOOST_DELAY * HZ, 1000)
 
 /*
@@ -1103,7 +1105,14 @@ static bool rcu_is_callbacks_kthread(void)
  */
 static void rcu_preempt_boost_start_gp(struct rcu_node *rnp)
 {
-	rnp->boost_time = jiffies + RCU_BOOST_DELAY_JIFFIES;
+	switch (kp_active_mode()) {
+	case 3:
+		rnp->boost_time = jiffies;
+	case 1:
+		rnp->boost_time = jiffies + (RCU_BOOST_DELAY_JIFFIES * 2);
+	default:
+		rnp->boost_time = jiffies + RCU_BOOST_DELAY_JIFFIES;
+	}
 }
 
 /*
@@ -1116,7 +1125,6 @@ static int rcu_spawn_one_boost_kthread(struct rcu_state *rsp,
 {
 	int rnp_index = rnp - &rsp->node[0];
 	unsigned long flags;
-	struct sched_param sp;
 	struct task_struct *t;
 
 	if (rcu_state_p != rsp)
@@ -1135,8 +1143,7 @@ static int rcu_spawn_one_boost_kthread(struct rcu_state *rsp,
 	raw_spin_lock_irqsave_rcu_node(rnp, flags);
 	rnp->boost_kthread_task = t;
 	raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
-	sp.sched_priority = kthread_prio;
-	sched_setscheduler_nocheck(t, SCHED_FIFO, &sp);
+	sched_set_fifo(t);
 	wake_up_process(t); /* get to TASK_INTERRUPTIBLE quickly. */
 	return 0;
 }
@@ -1150,10 +1157,7 @@ static void rcu_kthread_do_work(void)
 
 static void rcu_cpu_kthread_setup(unsigned int cpu)
 {
-	struct sched_param sp;
-
-	sp.sched_priority = kthread_prio;
-	sched_setscheduler_nocheck(current, SCHED_FIFO, &sp);
+	sched_set_fifo(current);
 }
 
 static void rcu_cpu_kthread_park(unsigned int cpu)
@@ -2385,7 +2389,7 @@ static void rcu_spawn_one_nocb_kthread(struct rcu_state *rsp, int cpu)
 	}
 
 	/* Spawn the kthread for this CPU and RCU flavor. */
-	t = kthread_run_perf_critical(cpu_lp_mask, rcu_nocb_kthread, rdp_spawn,
+	t = kthread_run(rcu_nocb_kthread, rdp_spawn,
 				      "rcuo%c/%d", rsp->abbr, cpu);
 	BUG_ON(IS_ERR(t));
 	WRITE_ONCE(rdp_spawn->nocb_kthread, t);

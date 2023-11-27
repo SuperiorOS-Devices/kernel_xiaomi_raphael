@@ -153,7 +153,6 @@ L(end_quick):
 	lsr	data1, data1, #56
 	sub	result, data1, data2, lsr #56
 	ret
-
 #endif
 
 L(mutual_align):
@@ -306,5 +305,4 @@ L(syndrome_check):
 L(ret0):
 	mov	result, #0
 	ret
-
 ENDPIPROC(strncmp)

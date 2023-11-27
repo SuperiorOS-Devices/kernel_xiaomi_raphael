@@ -321,16 +321,16 @@ compound_page_dtor * const compound_page_dtors[] = {
  * allocations below this point, only high priority ones. Automatically
  * tuned according to the amount of memory in the system.
  */
-int min_free_kbytes = 16384;
+int min_free_kbytes = 9456;
 int user_min_free_kbytes = -1;
-int watermark_scale_factor = 10;
+int watermark_scale_factor = 32;
 
 /*
  * Extra memory for the system to try freeing. Used to temporarily
  * free memory, to make space for new workloads. Anyone can allocate
  * down to the min watermarks controlled by min_free_kbytes above.
  */
-int extra_free_kbytes = 0;
+int extra_free_kbytes = 29615;
 
 static unsigned long __meminitdata nr_kernel_pages;
 static unsigned long __meminitdata nr_all_pages;
@@ -4118,7 +4118,6 @@ check_retry_cpuset(int cpuset_mems_cookie, struct alloc_context *ac)
 	return false;
 }
 
-extern int kp_active_mode(void);
 static inline struct page *
 __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 						struct alloc_context *ac)
@@ -4240,15 +4239,9 @@ retry:
 		wake_all_kswapds(order, gfp_mask, ac);
 
 	/* Boost when memory is low so allocation latency doesn't get too bad */
-	if (kp_active_mode() == 2 || kp_active_mode() == 0) {
-		cpu_input_boost_kick_max(50);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 50);
-		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 50);
-	} else if (kp_active_mode() == 3) {
-		cpu_input_boost_kick_max(100);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 100);
-		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 100);
-	}
+	cpu_input_boost_kick_max(100, false);
+	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 100);
+	devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW, 100);
 
 	reserve_flags = __gfp_pfmemalloc_flags(gfp_mask);
 	if (reserve_flags)

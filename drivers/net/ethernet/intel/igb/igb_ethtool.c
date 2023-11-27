@@ -757,8 +757,8 @@ static int igb_get_eeprom(struct net_device *netdev,
 	first_word = eeprom->offset >> 1;
 	last_word = (eeprom->offset + eeprom->len - 1) >> 1;
 
-	eeprom_buff = kmalloc(sizeof(u16) *
-			(last_word - first_word + 1), GFP_KERNEL);
+	eeprom_buff = kmalloc_array(last_word - first_word + 1, sizeof(u16),
+				    GFP_KERNEL);
 	if (!eeprom_buff)
 		return -ENOMEM;
 
@@ -926,11 +926,9 @@ static int igb_set_ringparam(struct net_device *netdev,
 	}
 
 	if (adapter->num_tx_queues > adapter->num_rx_queues)
-		temp_ring = vmalloc(adapter->num_tx_queues *
-				    sizeof(struct igb_ring));
+		temp_ring = vmalloc(array_size(sizeof(struct igb_ring), adapter->num_tx_queues));
 	else
-		temp_ring = vmalloc(adapter->num_rx_queues *
-				    sizeof(struct igb_ring));
+		temp_ring = vmalloc(array_size(sizeof(struct igb_ring), adapter->num_rx_queues));
 
 	if (!temp_ring) {
 		err = -ENOMEM;
@@ -2951,11 +2949,15 @@ static int igb_add_ethtool_nfc_entry(struct igb_adapter *adapter,
 	if (err)
 		goto err_out_w_lock;
 
-	igb_update_ethtool_nfc_entry(adapter, input, input->sw_idx);
+	err = igb_update_ethtool_nfc_entry(adapter, input, input->sw_idx);
+	if (err)
+		goto err_out_input_filter;
 
 	spin_unlock(&adapter->nfc_lock);
 	return 0;
 
+err_out_input_filter:
+	igb_erase_filter(adapter, input);
 err_out_w_lock:
 	spin_unlock(&adapter->nfc_lock);
 err_out:
@@ -3208,8 +3210,8 @@ static int igb_get_module_eeprom(struct net_device *netdev,
 	first_word = ee->offset >> 1;
 	last_word = (ee->offset + ee->len - 1) >> 1;
 
-	dataword = kmalloc(sizeof(u16) * (last_word - first_word + 1),
-			   GFP_KERNEL);
+	dataword = kmalloc_array(last_word - first_word + 1, sizeof(u16),
+				 GFP_KERNEL);
 	if (!dataword)
 		return -ENOMEM;
 

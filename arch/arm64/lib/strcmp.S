@@ -53,8 +53,6 @@
    NUL too in big-endian, byte-reverse the data before the NUL check.  */
 
 
-	/* Start of performance-critical section  -- one 64B cache line.  */
-	.align 6
 WEAK(strcmp)
 	sub	off2, src2, src1
 	mov	zeroones, REP8_01

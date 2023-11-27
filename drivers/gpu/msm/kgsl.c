@@ -4842,7 +4842,6 @@ static int kgsl_mmap(struct file *file, struct vm_area_struct *vma)
 	struct kgsl_process_private *private = dev_priv->process_priv;
 	struct kgsl_mem_entry *entry = NULL;
 	struct kgsl_device *device = dev_priv->device;
-	uint64_t flags;
 
 	/* Handle leagacy behavior for memstore */
 
@@ -4887,11 +4886,8 @@ static int kgsl_mmap(struct file *file, struct vm_area_struct *vma)
 
 	vma->vm_ops = &kgsl_gpumem_vm_ops;
 
-	flags = entry->memdesc.flags;
-
-	if (!(flags & KGSL_MEMFLAGS_IOCOHERENT) &&
-	    (cache == KGSL_CACHEMODE_WRITEBACK ||
-	     cache == KGSL_CACHEMODE_WRITETHROUGH)) {
+	if (cache == KGSL_CACHEMODE_WRITEBACK
+		|| cache == KGSL_CACHEMODE_WRITETHROUGH) {
 		int i;
 		unsigned long addr = vma->vm_start;
 		struct kgsl_memdesc *m = &entry->memdesc;
@@ -4909,15 +4905,6 @@ static int kgsl_mmap(struct file *file, struct vm_area_struct *vma)
 	if (atomic_inc_return(&entry->map_count) == 1)
 		atomic64_add(entry->memdesc.size,
 				&entry->priv->gpumem_mapped);
-
-	/*
-	 * kgsl gets the entry id or the gpu address through vm_pgoff.
-	 * It is used during mmap and never needed again. But this vm_pgoff
-	 * has different meaning at other parts of kernel. Not setting to
-	 * zero will let way for wrong assumption when tried to unmap a page
-	 * from this vma.
-	 */
-	vma->vm_pgoff = 0;
 
 	trace_kgsl_mem_mmap(entry, vma->vm_start);
 	return 0;
@@ -5043,7 +5030,6 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 {
 	int status = -EINVAL;
 	struct resource *res;
-	unsigned long irqflags = IRQF_TRIGGER_HIGH;
 
 	status = _register_device(device);
 	if (status)
@@ -5109,12 +5095,8 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 		goto error_pwrctrl_close;
 	}
 
-	if (!strcmp(device->name, "kgsl-3d0")) {
-		irqflags |= IRQF_PERF_AFFINE;
-	}
-
 	status = devm_request_irq(device->dev, device->pwrctrl.interrupt_num,
-				 kgsl_irq_handler, irqflags, device->name, device);
+				 kgsl_irq_handler, IRQF_TRIGGER_HIGH, device->name, device);
 	if (status) {
 		KGSL_DRV_ERR(device, "request_irq(%d) failed: %d\n",
 			      device->pwrctrl.interrupt_num, status);
@@ -5262,20 +5244,6 @@ static long kgsl_run_one_worker(struct kthread_worker *worker,
 	return 0;
 }
 
-static long kgsl_run_one_worker_perf(struct kthread_worker *worker,
-		struct task_struct **thread, const char *name)
-{
-	kthread_init_worker(worker);
-	*thread = kthread_run_perf_critical(cpu_perf_mask,
-		kthread_worker_fn, worker, name);
-	if (IS_ERR(*thread)) {
-		pr_err("unable to start %s\n", name);
-		return PTR_ERR(thread);
-	}
-	return 0;
-}
-
-
 static int __init kgsl_core_init(void)
 {
 	int result = 0;
@@ -5349,7 +5317,7 @@ static int __init kgsl_core_init(void)
 	kgsl_driver.mem_workqueue = alloc_workqueue("kgsl-mementry",
 		WQ_HIGHPRI | WQ_MEM_RECLAIM, 0);
 
-	if (IS_ERR_VALUE(kgsl_run_one_worker_perf(&kgsl_driver.worker,
+	if (IS_ERR_VALUE(kgsl_run_one_worker(&kgsl_driver.worker,
 			&kgsl_driver.worker_thread,
 			"kgsl_worker_thread")) ||
 		IS_ERR_VALUE(kgsl_run_one_worker(&kgsl_driver.low_prio_worker,

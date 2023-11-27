@@ -10,7 +10,12 @@
 #include <linux/kthread.h>
 #include <linux/msm_drm_notify.h>
 #include <linux/slab.h>
+#include <linux/event_tracking.h>
 #include <uapi/linux/sched/types.h>
+
+#if(CONFIG_INPUT_BOOST_DURATION_MS == 0)
+	unsigned long last_input_time;
+#endif
 
 enum {
 	SCREEN_OFF,
@@ -165,13 +170,10 @@ static void devfreq_update_boosts(struct boost_dev *b, unsigned long state)
 
 static int devfreq_boost_thread(void *data)
 {
-	static const struct sched_param sched_max_rt_prio = {
-		.sched_priority = MAX_RT_PRIO - 1
-	};
 	struct boost_dev *b = data;
 	unsigned long old_state = 0;
 
-	sched_setscheduler_nocheck(current, SCHED_FIFO, &sched_max_rt_prio);
+	sched_set_fifo(current);
 
 	while (1) {
 		bool should_stop = false;
@@ -228,7 +230,11 @@ static void devfreq_boost_input_event(struct input_handle *handle,
 	int i;
 
 	for (i = 0; i < DEVFREQ_MAX; i++)
-		__devfreq_boost_kick(&d->devices[i]);
+		__devfreq_boost_kick(d->devices + i);
+
+#if(CONFIG_INPUT_BOOST_DURATION_MS == 0)
+	last_input_time = jiffies;
+#endif
 }
 
 static int devfreq_boost_input_connect(struct input_handler *handler,
@@ -313,9 +319,8 @@ static int __init devfreq_boost_init(void)
 	for (i = 0; i < DEVFREQ_MAX; i++) {
 		struct boost_dev *b = &d->devices[i];
 
-		thread[i] = kthread_run_perf_critical(cpu_perf_mask,
-						      devfreq_boost_thread, b,
-						      "devfreq_boostd/%d", i);
+		thread[i] = kthread_run(devfreq_boost_thread, b,
+					"devfreq_boostd/%d", i);
 		if (IS_ERR(thread[i])) {
 			ret = PTR_ERR(thread[i]);
 			pr_err("Failed to create kthread, err: %d\n", ret);
